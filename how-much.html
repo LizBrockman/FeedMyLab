@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Labrador Puppy Feeding Helper</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --pink: #ff69b4;
@@ -41,13 +42,13 @@
       display: flex;
       gap: 18px;
       padding: 12px 16px 24px;
-      max-width: 1100px;
+      max-width: 1200px;
       margin: 0 auto;
       min-height: calc(100% - 70px);
     }
 
     .left {
-      width: 340px;
+      width: 320px;
       flex-shrink: 0;
       background: rgba(255, 255, 255, 0.97);
       border-radius: var(--radius);
@@ -60,8 +61,7 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
-      gap: 10px;
+      gap: 14px;
     }
 
     label {
@@ -143,12 +143,65 @@
       font-weight: 600;
     }
 
+    /* Charts */
+    .charts-panel {
+      background: rgba(255,255,255,0.97);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .charts-panel h2 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+      color: var(--purple);
+      font-weight: 800;
+    }
+
+    .chart-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .chart-tabs button {
+      margin: 0;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      background: #f8f0fc;
+      color: var(--purple);
+      border: 1.5px solid transparent;
+      box-shadow: none;
+    }
+
+    .chart-tabs button.active {
+      background: var(--purple);
+      color: #fff;
+      border-color: var(--purple);
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    .chart-wrap canvas {
+      max-height: 280px;
+    }
+
+    .chart-hint {
+      font-size: 0.78rem;
+      color: #9a7aaa;
+      margin-top: 8px;
+      text-align: center;
+    }
+
     .record-stack {
       width: 100%;
-      max-width: 440px;
       display: flex;
       flex-direction: column;
-      align-items: stretch;
       gap: 0;
     }
 
@@ -156,8 +209,6 @@
       display: flex;
       gap: 8px;
       justify-content: flex-end;
-      width: 100%;
-      max-width: 440px;
       flex-wrap: wrap;
     }
 
@@ -270,9 +321,8 @@
     .empty-state {
       text-align: center;
       color: #9a7aaa;
-      padding: 40px 20px;
+      padding: 32px 20px;
       font-size: 0.95rem;
-      max-width: 440px;
     }
 
     /* Intro overlay */
@@ -326,7 +376,7 @@
     @media (max-width: 800px) {
       .container { flex-direction: column; }
       .left { width: 100%; }
-      .right, .record-stack, .toolbar { align-items: stretch; max-width: none; }
+      .chart-wrap { height: 240px; }
       .card .grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -387,11 +437,25 @@
       </form>
 
       <div class="note">
-        Schedule: Labrador large-breed puppy formula. Each calculation is saved in history (right). Weight is compared to the sex-adjusted table weight. Growth-rate warnings appear when average lb per week of age is high and the puppy is already over the suggested weight.
+        Schedule: Labrador large-breed puppy formula. Charts show the table curve and your logged weights. Weight is compared to the sex-adjusted table weight.
       </div>
     </div>
 
     <div class="right">
+      <!-- Charts -->
+      <div class="charts-panel">
+        <h2>Growth charts</h2>
+        <div class="chart-tabs" role="tablist">
+          <button type="button" class="active" data-chart="weight" role="tab" aria-selected="true">Weight vs Age</button>
+          <button type="button" data-chart="cups" role="tab" aria-selected="false">Cups / Day</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="weightChart" aria-label="Weight versus age chart"></canvas>
+          <canvas id="cupsChart" aria-label="Cups per day versus age chart" hidden></canvas>
+        </div>
+        <p class="chart-hint" id="chartHint">Hover points for details. Your weigh-ins appear as dots on the weight chart.</p>
+      </div>
+
       <div class="toolbar">
         <button type="button" class="secondary" id="clearHistoryBtn">Clear history</button>
       </div>
@@ -431,7 +495,7 @@
     ].sort((a, b) => a.weeks - b.weeks);
 
     const GRAMS_PER_CUP = 113;
-    const STORAGE_KEY = 'labPuppyFeedingHelper_v2';
+    const STORAGE_KEY = 'labPuppyFeedingHelper_v3';
 
     // ——— Utilities ———
     function parseLocalDate(iso) {
@@ -465,7 +529,6 @@
     function mealsPerDay(weeks) {
       if (weeks < 12) return 4;
       if (weeks < 26) return 3;
-      if (weeks < 52) return 2;
       return 2;
     }
 
@@ -488,10 +551,19 @@
       }
     }
 
+    function getSexOffset() {
+      const sex = document.getElementById('sex').value;
+      if (sex === 'female') return -1;
+      if (sex === 'male') return 1;
+      return 0;
+    }
+
     // ——— State ———
     let history = [];
     let previouslyFocused = null;
     let introKeyHandler = null;
+    let weightChart = null;
+    let cupsChart = null;
 
     function loadState() {
       try {
@@ -521,6 +593,191 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ puppy, history }));
       } catch (e) {
         console.warn('Could not save state', e);
+      }
+    }
+
+    // ——— Charts ———
+    function buildScheduleSeries(offset = 0) {
+      return feedingSchedule.map(r => ({
+        x: r.weeks,
+        y: +(r.weight + offset).toFixed(1)
+      }));
+    }
+
+    function buildCupsSeries() {
+      return feedingSchedule.map(r => ({
+        x: r.weeks,
+        y: r.cupsPerDay
+      }));
+    }
+
+    function getUserWeightPoints() {
+      return history
+        .filter(r => r.weightDisplay && r.weightDisplay !== '—' && r.ageWeeks != null)
+        .map(r => {
+          const w = parseFloat(r.weightDisplay);
+          return Number.isFinite(w) ? { x: +r.ageWeeks.toFixed(2), y: w } : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.x - b.x);
+    }
+
+    function commonChartOptions(yLabel) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { boxWidth: 12, padding: 12, font: { size: 12 } }
+          },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const x = items[0]?.parsed?.x;
+                return x != null ? `Age: ${Number(x).toFixed(1)} weeks` : '';
+              },
+              label(ctx) {
+                const y = ctx.parsed.y;
+                const unit = yLabel.includes('lb') ? ' lb' : ' cups';
+                return `${ctx.dataset.label}: ${Number(y).toFixed(2)}${unit}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            title: { display: true, text: 'Age (weeks)', color: '#7b2cbf', font: { weight: '600' } },
+            min: 6,
+            max: 70,
+            ticks: { stepSize: 4 },
+            grid: { color: 'rgba(123,44,191,0.06)' }
+          },
+          y: {
+            title: { display: true, text: yLabel, color: '#7b2cbf', font: { weight: '600' } },
+            beginAtZero: false,
+            grid: { color: 'rgba(123,44,191,0.06)' }
+          }
+        }
+      };
+    }
+
+    function initCharts() {
+      const weightCtx = document.getElementById('weightChart').getContext('2d');
+      const cupsCtx = document.getElementById('cupsChart').getContext('2d');
+
+      weightChart = new Chart(weightCtx, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'Table suggested (lb)',
+              data: buildScheduleSeries(0),
+              borderColor: '#b39ddb',
+              backgroundColor: 'rgba(179,157,219,0.15)',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.25,
+              fill: false
+            },
+            {
+              label: 'Sex-adjusted suggested (lb)',
+              data: buildScheduleSeries(getSexOffset()),
+              borderColor: '#7b2cbf',
+              backgroundColor: 'rgba(123,44,191,0.12)',
+              borderWidth: 2.5,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.25,
+              fill: false
+            },
+            {
+              label: 'Your weigh-ins (lb)',
+              data: getUserWeightPoints(),
+              borderColor: '#ff69b4',
+              backgroundColor: '#ff69b4',
+              borderWidth: 0,
+              pointRadius: 7,
+              pointHoverRadius: 9,
+              pointStyle: 'circle',
+              showLine: false,
+              order: 0
+            }
+          ]
+        },
+        options: commonChartOptions('Weight (lb)')
+      });
+
+      cupsChart = new Chart(cupsCtx, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'Cups per day',
+              data: buildCupsSeries(),
+              borderColor: '#ff69b4',
+              backgroundColor: 'rgba(255,105,180,0.15)',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.2,
+              fill: true,
+              stepped: 'before'
+            }
+          ]
+        },
+        options: {
+          ...commonChartOptions('Cups / day'),
+          scales: {
+            ...commonChartOptions('Cups / day').scales,
+            y: {
+              ...commonChartOptions('Cups / day').scales.y,
+              min: 0,
+              max: 7
+            }
+          }
+        }
+      });
+    }
+
+    function updateCharts() {
+      if (!weightChart || !cupsChart) return;
+
+      const offset = getSexOffset();
+      weightChart.data.datasets[0].data = buildScheduleSeries(0);
+      weightChart.data.datasets[1].data = buildScheduleSeries(offset);
+      weightChart.data.datasets[1].label =
+        offset === 0 ? 'Suggested (no sex adjust)' :
+        offset < 0 ? 'Female-adjusted suggested (lb)' :
+        'Male-adjusted suggested (lb)';
+      weightChart.data.datasets[2].data = getUserWeightPoints();
+      weightChart.update('none');
+
+      cupsChart.data.datasets[0].data = buildCupsSeries();
+      cupsChart.update('none');
+    }
+
+    function showChart(which) {
+      const weightCanvas = document.getElementById('weightChart');
+      const cupsCanvas = document.getElementById('cupsChart');
+      const hint = document.getElementById('chartHint');
+      document.querySelectorAll('.chart-tabs button').forEach(btn => {
+        const active = btn.dataset.chart === which;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      if (which === 'weight') {
+        weightCanvas.hidden = false;
+        cupsCanvas.hidden = true;
+        hint.textContent = 'Hover points for details. Your weigh-ins appear as pink dots.';
+      } else {
+        weightCanvas.hidden = true;
+        cupsCanvas.hidden = false;
+        hint.textContent = 'Daily cups recommended by the schedule at each age.';
       }
     }
 
@@ -624,6 +881,7 @@
         history.splice(index, 1);
         saveState();
         renderHistory();
+        updateCharts();
       });
 
       return div;
@@ -631,7 +889,6 @@
 
     function renderHistory() {
       const stack = document.getElementById('recordStack');
-      const empty = document.getElementById('emptyState');
       stack.innerHTML = '';
       if (history.length === 0) {
         const e = document.createElement('div');
@@ -684,6 +941,7 @@
       saveState();
       hideIntro();
       updateAgePreview();
+      updateCharts();
       document.getElementById('weight').focus();
     });
 
@@ -756,7 +1014,6 @@
         const diffLbs = absDiff.toFixed(1);
         const diffPercent = ((absDiff / suggested) * 100).toFixed(1);
 
-        // Within 10% or 1 lb (whichever is larger) counts as "ok"
         const tolerance = Math.max(1, suggested * 0.1);
         let status = 'ok';
         if (absDiff > tolerance) {
@@ -768,7 +1025,6 @@
         if (weeks >= 1) {
           const weightPerWeek = actual / weeks;
           record.weightPerWeek = weightPerWeek;
-          // Warn only when average is high AND already over suggested
           if (weightPerWeek > 2.2 && status === 'over') {
             record.rateWarning = true;
           }
@@ -776,10 +1032,10 @@
       }
 
       history.unshift(record);
-      // Keep last 50 entries
       if (history.length > 50) history = history.slice(0, 50);
       saveState();
       renderHistory();
+      updateCharts();
       document.getElementById('weight').value = '';
       document.getElementById('weight').focus();
     });
@@ -787,6 +1043,7 @@
     document.getElementById('savePuppyBtn').addEventListener('click', () => {
       saveState();
       updateAgePreview();
+      updateCharts();
       alert('Puppy details saved.');
     });
 
@@ -796,16 +1053,31 @@
         history = [];
         saveState();
         renderHistory();
+        updateCharts();
       }
     });
 
-    document.getElementById('bdate').addEventListener('change', updateAgePreview);
+    document.getElementById('bdate').addEventListener('change', () => {
+      updateAgePreview();
+      updateCharts();
+    });
     document.getElementById('bdate').addEventListener('input', updateAgePreview);
+
+    document.getElementById('sex').addEventListener('change', () => {
+      saveState();
+      updateCharts();
+    });
+
+    document.querySelectorAll('.chart-tabs button').forEach(btn => {
+      btn.addEventListener('click', () => showChart(btn.dataset.chart));
+    });
 
     // ——— Init ———
     loadState();
     renderHistory();
     updateAgePreview();
+    initCharts();
+    updateCharts();
 
     const hasPuppy = document.getElementById('name').value && document.getElementById('bdate').value;
     if (!hasPuppy) {
