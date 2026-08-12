@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Labrador Puppy Feeding Helper</title>
+  <style>
+    :root {
+      --pink: #ff69b4;
+      --purple: #7b2cbf;
+      --purple-soft: rgba(123, 44, 191, 0.08);
+      --card-bg: linear-gradient(145deg, #fff0fb 0%, #f5ecff 100%);
+      --ok: #2e7d32;
+      --warn: #e65100;
+      --bad: #c62828;
+      --text: #2d1b36;
+      --muted: #5f2b72;
+      --radius: 12px;
+      --shadow: 0 8px 24px rgba(123, 44, 191, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(145deg, #ffe6f8 0%, #f0e6ff 100%);
+      color: var(--text);
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--purple);
+      margin: 16px 12px 8px;
+      font-size: clamp(1.35rem, 4vw, 1.75rem);
+      font-weight: 800;
+    }
+
+    .container {
+      display: flex;
+      gap: 18px;
+      padding: 12px 16px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: calc(100% - 70px);
+    }
+
+    .left {
+      width: 340px;
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .right {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      color: var(--purple);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 9px 11px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #e8d4f5;
+      font-size: 0.95rem;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid var(--pink);
+      outline-offset: 1px;
+    }
+
+    button, .btn {
+      margin-top: 14px;
+      padding: 10px 16px;
+      background: var(--pink);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 12px rgba(255, 105, 180, 0.25);
+      transition: filter 0.15s, transform 0.1s;
+    }
+
+    button:hover, .btn:hover { filter: brightness(0.96); }
+    button:active, .btn:active { transform: scale(0.98); }
+
+    button.secondary {
+      background: #fff;
+      color: var(--purple);
+      border: 1.5px solid #e0c4f0;
+      box-shadow: none;
+      margin-top: 8px;
+    }
+
+    button.danger {
+      background: #fff5f5;
+      color: var(--bad);
+      border: 1.5px solid #ffcdd2;
+      box-shadow: none;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 14px;
+      background: #fff6fb;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #f0d9f5;
+      line-height: 1.45;
+    }
+
+    .age-preview {
+      font-size: 0.85rem;
+      color: var(--purple);
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    .record-stack {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      width: 100%;
+      max-width: 440px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar button {
+      margin-top: 0;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+    }
+
+    .card {
+      width: 100%;
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-top: 12px;
+      border: 2px solid rgba(123, 44, 191, 0.12);
+      position: relative;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.25s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card .title {
+      color: var(--purple);
+      font-weight: 800;
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+      padding-right: 28px;
+    }
+
+    .card .meta {
+      font-size: 0.8rem;
+      color: #8a6a9a;
+      margin-bottom: 10px;
+    }
+
+    .card .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+      font-size: 0.9rem;
+      color: #3b1f45;
+    }
+
+    .card .grid strong {
+      color: var(--purple);
+      font-weight: 600;
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .card .full { grid-column: 1 / -1; }
+
+    .compare {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .compare.ok { background: #eef7ec; color: var(--ok); border: 1px solid #c8e6c9; }
+    .compare.under { background: #fff8e6; color: var(--warn); border: 1px solid #ffe0b2; }
+    .compare.over { background: #ffebee; color: var(--bad); border: 1px solid #ffcdd2; }
+
+    .rate-warning {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #fff0f0;
+      color: var(--bad);
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      border: 1px solid #ffcdd2;
+    }
+
+    .card .delete-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      margin: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.8);
+      color: #999;
+      border: 1px solid #eee;
+      font-size: 1rem;
+      line-height: 1;
+      box-shadow: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card .delete-btn:hover {
+      background: #ffebee;
+      color: var(--bad);
+      border-color: #ffcdd2;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #9a7aaa;
+      padding: 40px 20px;
+      font-size: 0.95rem;
+      max-width: 440px;
+    }
+
+    /* Intro overlay */
+    #introOverlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(123,44,191,0.2), rgba(255,255,255,0.85));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 16px;
+    }
+
+    #introBox {
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+      border: 3px solid rgba(123,44,191,0.08);
+    }
+
+    #introBox h2 {
+      margin: 0 0 6px;
+      color: var(--purple);
+      text-align: center;
+      font-size: 1.25rem;
+    }
+
+    #introBox .sub {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    #introBox .row { margin-top: 16px; text-align: center; }
+
+    .disclaimer {
+      font-size: 0.78rem;
+      color: #888;
+      text-align: center;
+      padding: 8px 16px 20px;
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 800px) {
+      .container { flex-direction: column; }
+      .left { width: 100%; }
+      .right, .record-stack, .toolbar { align-items: stretch; max-width: none; }
+      .card .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🐾 Labrador Puppy Feeding Helper</h1>
+
+  <!-- Intro modal -->
+  <div id="introOverlay" role="dialog" aria-modal="true" aria-labelledby="introTitle" hidden>
+    <div id="introBox">
+      <h2 id="introTitle">Tell us about your puppy</h2>
+      <p class="sub">We’ll use this to calculate age-based feeding amounts.</p>
+      <form id="introForm">
+        <label for="introName">Puppy name</label>
+        <input id="introName" type="text" required placeholder="e.g., Buddy" autocomplete="off">
+        <label for="introBdate">Birthdate</label>
+        <input id="introBdate" type="date" required>
+        <label for="introSex">Sex</label>
+        <select id="introSex" required>
+          <option value="">— choose —</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="unknown">Unknown</option>
+        </select>
+        <div class="row">
+          <button type="submit">Start</button>
+        </div>
+        <div class="note" style="margin-top:14px;">
+          Uses a Labrador large-breed puppy schedule. Female suggested weight is −1 lb, male +1 lb vs the table. Always follow your food’s label and consult your vet.
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="container" id="mainContainer">
+    <div class="left">
+      <form id="mainForm">
+        <label for="name">Puppy name</label>
+        <input id="name" type="text" required>
+
+        <label for="bdate">Birthdate</label>
+        <input id="bdate" type="date" required>
+        <div class="age-preview" id="agePreview" aria-live="polite"></div>
+
+        <label for="sex">Sex</label>
+        <select id="sex" required>
+          <option value="">— choose —</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="unknown">Unknown</option>
+        </select>
+
+        <label for="weight">Current weight (lbs)</label>
+        <input id="weight" type="number" step="0.1" min="0" max="120" placeholder="e.g., 22.5">
+
+        <button type="submit">Calculate Weekly Feeding</button>
+        <button type="button" class="secondary" id="savePuppyBtn">Save puppy details</button>
+      </form>
+
+      <div class="note">
+        Schedule: Labrador large-breed puppy formula. Each calculation is saved in history (right). Weight is compared to the sex-adjusted table weight. Growth-rate warnings appear when average lb per week of age is high and the puppy is already over the suggested weight.
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="toolbar">
+        <button type="button" class="secondary" id="clearHistoryBtn">Clear history</button>
+      </div>
+      <div class="record-stack" id="recordStack" aria-live="polite">
+        <div class="empty-state" id="emptyState">No calculations yet. Enter a weight and click Calculate.</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="disclaimer">
+    This tool provides general guidance based on a sample Labrador puppy feeding table. It is not veterinary advice.
+    Always follow the feeding guide on your specific food, monitor body condition, and consult your veterinarian for personalized recommendations—especially for large-breed puppies whose joints are sensitive to rapid growth.
+  </p>
+
+  <script>
+    // ——— Feeding schedule (age in weeks, cups/day, suggested weight lb) ———
+    const feedingSchedule = [
+      { weeks: 8, cupsPerDay: 3.75, weight: 15 },
+      { weeks: 9, cupsPerDay: 3.75, weight: 16.5 },
+      { weeks: 10, cupsPerDay: 3.75, weight: 18 },
+      { weeks: 11, cupsPerDay: 3.75, weight: 20 },
+      { weeks: 12, cupsPerDay: 4.00, weight: 22 },
+      { weeks: 13, cupsPerDay: 4.00, weight: 24 },
+      { weeks: 15, cupsPerDay: 5.00, weight: 33 },
+      { weeks: 18, cupsPerDay: 5.00, weight: 38 },
+      { weeks: 22, cupsPerDay: 5.00, weight: 50 },
+      { weeks: 26, cupsPerDay: 5.50, weight: 55 },
+      { weeks: 30, cupsPerDay: 5.50, weight: 60 },
+      { weeks: 35, cupsPerDay: 5.50, weight: 65 },
+      { weeks: 39, cupsPerDay: 5.50, weight: 66 },
+      { weeks: 43, cupsPerDay: 5.50, weight: 67 },
+      { weeks: 48, cupsPerDay: 5.50, weight: 68 },
+      { weeks: 52, cupsPerDay: 5.50, weight: 69 },
+      { weeks: 56, cupsPerDay: 5.50, weight: 70 },
+      { weeks: 61, cupsPerDay: 5.50, weight: 72 },
+      { weeks: 65, cupsPerDay: 4.50, weight: 75 }
+    ].sort((a, b) => a.weeks - b.weeks);
+
+    const GRAMS_PER_CUP = 113;
+    const STORAGE_KEY = 'labPuppyFeedingHelper_v2';
+
+    // ——— Utilities ———
+    function parseLocalDate(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+      const [y, m, d] = iso.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      return isNaN(date.getTime()) ? null : date;
+    }
+
+    function ageWeeksFromBirth(birthISO) {
+      const b = parseLocalDate(birthISO);
+      if (!b) return null;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const birth = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      return (today - birth) / msPerWeek;
+    }
+
+    function findFeedingForWeeks(weeks) {
+      if (weeks == null || isNaN(weeks) || weeks < 0) return null;
+      if (weeks < feedingSchedule[0].weeks) return null;
+      let chosen = feedingSchedule[0];
+      for (const row of feedingSchedule) {
+        if (weeks >= row.weeks) chosen = row;
+        else break;
+      }
+      return chosen;
+    }
+
+    function mealsPerDay(weeks) {
+      if (weeks < 12) return 4;
+      if (weeks < 26) return 3;
+      if (weeks < 52) return 2;
+      return 2;
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatDateTime(ts) {
+      try {
+        return new Date(ts).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        });
+      } catch {
+        return '';
+      }
+    }
+
+    // ——— State ———
+    let history = [];
+    let previouslyFocused = null;
+    let introKeyHandler = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.puppy) {
+          document.getElementById('name').value = data.puppy.name || '';
+          document.getElementById('bdate').value = data.puppy.birthdate || '';
+          document.getElementById('sex').value = data.puppy.sex || '';
+        }
+        if (Array.isArray(data.history)) {
+          history = data.history;
+        }
+      } catch (e) {
+        console.warn('Could not load saved state', e);
+      }
+    }
+
+    function saveState() {
+      const puppy = {
+        name: document.getElementById('name').value.trim(),
+        birthdate: document.getElementById('bdate').value,
+        sex: document.getElementById('sex').value
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ puppy, history }));
+      } catch (e) {
+        console.warn('Could not save state', e);
+      }
+    }
+
+    // ——— Modal focus trap ———
+    function getFocusable(container) {
+      return Array.from(container.querySelectorAll(
+        'input:not([disabled]), button:not([disabled]), select:not([disabled]), a[href]'
+      )).filter(el => el.offsetParent !== null || el === document.activeElement);
+    }
+
+    function trapFocus(e) {
+      if (e.key !== 'Tab') return;
+      const box = document.getElementById('introBox');
+      const focusables = getFocusable(box);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    function showIntro() {
+      const overlay = document.getElementById('introOverlay');
+      const main = document.getElementById('mainContainer');
+      previouslyFocused = document.activeElement;
+      if ('inert' in HTMLElement.prototype) main.inert = true;
+      else main.setAttribute('aria-hidden', 'true');
+      overlay.hidden = false;
+      overlay.style.display = 'flex';
+      introKeyHandler = trapFocus;
+      overlay.addEventListener('keydown', introKeyHandler);
+      setTimeout(() => document.getElementById('introName').focus(), 50);
+    }
+
+    function hideIntro() {
+      const overlay = document.getElementById('introOverlay');
+      const main = document.getElementById('mainContainer');
+      if ('inert' in HTMLElement.prototype) main.inert = false;
+      else main.removeAttribute('aria-hidden');
+      if (introKeyHandler) {
+        overlay.removeEventListener('keydown', introKeyHandler);
+        introKeyHandler = null;
+      }
+      overlay.hidden = true;
+      overlay.style.display = 'none';
+      if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+      previouslyFocused = null;
+    }
+
+    // ——— Card rendering ———
+    function createCard(record, index) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.dataset.index = index;
+
+      const sexLabel = record.sex.charAt(0).toUpperCase() + record.sex.slice(1);
+      const months = Math.floor(record.ageWeeks / 4.345);
+
+      div.innerHTML = `
+        <button type="button" class="delete-btn" aria-label="Delete this entry" title="Delete">×</button>
+        <div class="title">${escapeHtml(record.name)} · Lab (${escapeHtml(sexLabel)})</div>
+        <div class="meta">${formatDateTime(record.timestamp)} · Age ${record.ageWeeks.toFixed(1)} weeks (~${months} mo)</div>
+        <div class="grid">
+          <div><strong>Birthdate</strong>${escapeHtml(record.birthdate)}</div>
+          <div><strong>Weight</strong>${escapeHtml(record.weightDisplay)}</div>
+          <div><strong>Daily cups</strong>${record.dailyCups} cups</div>
+          <div><strong>Meals / day</strong>${record.meals}</div>
+          <div><strong>Weekly cups</strong>${record.weeklyCups} cups</div>
+          <div><strong>≈ Weekly grams</strong>${record.weeklyGrams} g</div>
+          <div class="full"><strong>Schedule row</strong>${record.scheduleWeek} wks → table ${record.scheduleWeight} lb · sex-adjusted ${record.adjustedSuggested} lb</div>
+        </div>
+      `;
+
+      if (record.comparison) {
+        const cmp = document.createElement('div');
+        cmp.className = `compare ${record.comparison.status}`;
+        const { status, diffLbs, diffPercent } = record.comparison;
+        if (status === 'ok') {
+          cmp.textContent = `Weight is within range (Δ ${diffLbs} lb / ${diffPercent}%).`;
+        } else if (status === 'under') {
+          cmp.textContent = `Under adjusted suggested weight by ${diffLbs} lb (${diffPercent}%).`;
+        } else {
+          cmp.textContent = `Over adjusted suggested weight by ${diffLbs} lb (${diffPercent}%).`;
+        }
+        div.appendChild(cmp);
+      }
+
+      if (record.rateWarning) {
+        const rw = document.createElement('div');
+        rw.className = 'rate-warning';
+        rw.textContent = `Growth-rate note: average ${record.weightPerWeek.toFixed(2)} lb per week of age is high while already over suggested weight — consider discussing with your vet.`;
+        div.appendChild(rw);
+      }
+
+      div.querySelector('.delete-btn').addEventListener('click', () => {
+        history.splice(index, 1);
+        saveState();
+        renderHistory();
+      });
+
+      return div;
+    }
+
+    function renderHistory() {
+      const stack = document.getElementById('recordStack');
+      const empty = document.getElementById('emptyState');
+      stack.innerHTML = '';
+      if (history.length === 0) {
+        const e = document.createElement('div');
+        e.className = 'empty-state';
+        e.id = 'emptyState';
+        e.textContent = 'No calculations yet. Enter a weight and click Calculate.';
+        stack.appendChild(e);
+        return;
+      }
+      history.forEach((rec, i) => {
+        stack.appendChild(createCard(rec, i));
+      });
+    }
+
+    // ——— Age preview ———
+    function updateAgePreview() {
+      const el = document.getElementById('agePreview');
+      const bd = document.getElementById('bdate').value;
+      const weeks = ageWeeksFromBirth(bd);
+      if (weeks == null) {
+        el.textContent = '';
+        return;
+      }
+      if (weeks < 0) {
+        el.textContent = 'Birthdate is in the future.';
+        return;
+      }
+      const months = (weeks / 4.345).toFixed(1);
+      el.textContent = `Current age ≈ ${weeks.toFixed(1)} weeks (${months} months)`;
+    }
+
+    // ——— Form handlers ———
+    document.getElementById('introForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const n = document.getElementById('introName').value.trim();
+      const bd = document.getElementById('introBdate').value;
+      const sx = document.getElementById('introSex').value;
+      if (!n || !bd || !sx) {
+        alert('Please enter name, birthdate, and sex.');
+        return;
+      }
+      const weeks = ageWeeksFromBirth(bd);
+      if (weeks == null || weeks < 0) {
+        alert('Please enter a valid birthdate in the past.');
+        return;
+      }
+      document.getElementById('name').value = n;
+      document.getElementById('bdate').value = bd;
+      document.getElementById('sex').value = sx;
+      saveState();
+      hideIntro();
+      updateAgePreview();
+      document.getElementById('weight').focus();
+    });
+
+    document.getElementById('mainForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const birthdate = document.getElementById('bdate').value;
+      const sex = document.getElementById('sex').value || 'unknown';
+      const weightVal = document.getElementById('weight').value;
+
+      if (!name || !birthdate || !sex) {
+        alert('Please enter puppy name, birthdate, and sex.');
+        return;
+      }
+
+      let validatedWeight = null;
+      let weightDisplay = '—';
+      if (weightVal !== '') {
+        validatedWeight = Number(weightVal);
+        if (!isFinite(validatedWeight) || validatedWeight < 0) {
+          alert('Please enter a valid non-negative weight.');
+          return;
+        }
+        weightDisplay = `${validatedWeight.toFixed(1)} lb`;
+      }
+
+      const weeks = ageWeeksFromBirth(birthdate);
+      if (weeks == null || weeks < 0) {
+        alert('Please enter a valid birthdate in the past.');
+        return;
+      }
+
+      const scheduleRow = findFeedingForWeeks(weeks);
+      if (!scheduleRow) {
+        alert('Puppy is younger than the first schedule entry (8 weeks). Feeding amounts are not defined yet.');
+        return;
+      }
+
+      const dailyCups = Number(scheduleRow.cupsPerDay);
+      const weeklyCups = +(dailyCups * 7).toFixed(2);
+      const weeklyGrams = Math.round(weeklyCups * GRAMS_PER_CUP);
+      const meals = mealsPerDay(weeks);
+
+      const tableSuggested = Number(scheduleRow.weight);
+      let adjustedSuggested = tableSuggested;
+      if (sex === 'female') adjustedSuggested = +(tableSuggested - 1).toFixed(1);
+      else if (sex === 'male') adjustedSuggested = +(tableSuggested + 1).toFixed(1);
+
+      const record = {
+        name,
+        birthdate,
+        sex,
+        weightDisplay,
+        ageWeeks: weeks,
+        dailyCups: dailyCups.toFixed(2),
+        weeklyCups: weeklyCups.toFixed(2),
+        weeklyGrams,
+        meals,
+        scheduleWeek: scheduleRow.weeks,
+        scheduleWeight: scheduleRow.weight,
+        adjustedSuggested,
+        timestamp: Date.now()
+      };
+
+      if (validatedWeight !== null && !isNaN(adjustedSuggested) && adjustedSuggested > 0) {
+        const actual = validatedWeight;
+        const suggested = adjustedSuggested;
+        const diff = actual - suggested;
+        const absDiff = Math.abs(diff);
+        const diffLbs = absDiff.toFixed(1);
+        const diffPercent = ((absDiff / suggested) * 100).toFixed(1);
+
+        // Within 10% or 1 lb (whichever is larger) counts as "ok"
+        const tolerance = Math.max(1, suggested * 0.1);
+        let status = 'ok';
+        if (absDiff > tolerance) {
+          status = diff < 0 ? 'under' : 'over';
+        }
+
+        record.comparison = { status, diffLbs, diffPercent, diffRaw: diff };
+
+        if (weeks >= 1) {
+          const weightPerWeek = actual / weeks;
+          record.weightPerWeek = weightPerWeek;
+          // Warn only when average is high AND already over suggested
+          if (weightPerWeek > 2.2 && status === 'over') {
+            record.rateWarning = true;
+          }
+        }
+      }
+
+      history.unshift(record);
+      // Keep last 50 entries
+      if (history.length > 50) history = history.slice(0, 50);
+      saveState();
+      renderHistory();
+      document.getElementById('weight').value = '';
+      document.getElementById('weight').focus();
+    });
+
+    document.getElementById('savePuppyBtn').addEventListener('click', () => {
+      saveState();
+      updateAgePreview();
+      alert('Puppy details saved.');
+    });
+
+    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+      if (history.length === 0) return;
+      if (confirm('Clear all calculation history?')) {
+        history = [];
+        saveState();
+        renderHistory();
+      }
+    });
+
+    document.getElementById('bdate').addEventListener('change', updateAgePreview);
+    document.getElementById('bdate').addEventListener('input', updateAgePreview);
+
+    // ——— Init ———
+    loadState();
+    renderHistory();
+    updateAgePreview();
+
+    const hasPuppy = document.getElementById('name').value && document.getElementById('bdate').value;
+    if (!hasPuppy) {
+      showIntro();
+    } else {
+      document.getElementById('introOverlay').hidden = true;
+      document.getElementById('introOverlay').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
